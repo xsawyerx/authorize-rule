@@ -222,6 +222,12 @@ More complicated structures (other than hashref of keys to string values)
 are currently not supported, though there are plans to add callbacks in
 order to allow the user to specify their own checks of conditions.
 
+=head1 ALPHA CODE
+
+I can't promise some of this won't change in the next few versions.
+
+Stay tuned.
+
 =head1 ATTRIBUTES
 
 =head2 default
