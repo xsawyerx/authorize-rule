@@ -135,6 +135,12 @@ sub check {
 
 __END__
 
+=head1 ALPHA CODE
+
+I can't promise some of this won't change in the next few versions.
+
+Stay tuned.
+
 =head1 SYNOPSIS
 
 A simple example:
