@@ -144,7 +144,7 @@ A simple example:
             # Marge can do everything
             Marge => [ allow => '*' ],
 
-            # Homer can do everything except go to the kitchen
+            # Homer can do everything except use the oven
             Homer => [
                 deny  => ['oven'],
                 allow => '*',
