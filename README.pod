@@ -6,7 +6,7 @@ Authorize::Rule - Rule-based authorization mechanism
 
 =head1 VERSION
 
-version 0.001
+version 0.002
 
 =head1 SYNOPSIS
 
@@ -17,7 +17,7 @@ A simple example:
             # Marge can do everything
             Marge => [ allow => '*' ],
 
-            # Homer can do everything except go to the kitchen
+            # Homer can do everything except use the oven
             Homer => [
                 deny  => ['oven'],
                 allow => '*',
