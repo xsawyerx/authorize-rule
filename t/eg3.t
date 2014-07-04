@@ -9,21 +9,27 @@ use Authorize::Rule;
 my $auth = Authorize::Rule->new(
     default => -1,
     rules   => {
-        cats => [ deny => ['bedroom'], allow => '*' ],
-        dogs => [
-            deny  => [ 'table', 'laundry room', 'bedroom' ],
-            allow => '*',
-        ],
+        cats => {
+            bedroom => [ [0] ],
+            ''      => [ [1] ],
+        },
 
-        kitties => [
-            allow => ['bedroom'],
-            deny  => '*',
-        ],
+        dogs => {
+            table          => [ [0] ],
+            bedroom        => [ [0] ],
+            'laundry room' => [ [0] ],
+            ''             => [ [1] ],
+        },
+
+        kitties => {
+            bedroom => [ [1] ],
+            ''      => [ [0] ],
+        },
     }
 );
 
 isa_ok( $auth, 'Authorize::Rule' );
-can_ok( $auth, 'check'           );
+can_ok( $auth, 'is_allowed'      );
 
 my @tests = (
     [ qw<1 cats   kitchen> ],
@@ -43,7 +49,7 @@ foreach my $test (@tests) {
                       " access $resource";
 
     cmp_ok(
-        $auth->check( $entity => $resource ),
+        $auth->is_allowed( $entity => $resource ),
         '==',
         $success,
         $description,

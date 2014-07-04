@@ -13,19 +13,20 @@ $Data::Dumper::Indent = 0;
 my $auth = Authorize::Rule->new(
     default => -1,
     rules   => {
-        dogs => [
-            allow => {
-                table => { owner => ['jim', 'john'] }
-            },
+        dogs => {
+            table => [
+                [ 1, { owner => 'jim'  } ],
+                [ 1, { owner => 'john' } ],
+                [0],
+            ],
 
-            deny  => ['table'],
-            allow => '*',
-        ]
+            ''    => [ [1] ],
+        }
     },
 );
 
 isa_ok( $auth, 'Authorize::Rule' );
-can_ok( $auth, 'check'           );
+can_ok( $auth, 'is_allowed'      );
 
 my @tests = (
     [ qw<1 dogs table>, { owner => 'jim'  } ],
@@ -42,7 +43,7 @@ foreach my $test (@tests) {
                       ( $params ? ', ' . Dumper($params) : '' );
 
     cmp_ok(
-        $auth->check( $entity => $resource, $params ),
+        $auth->is_allowed( $entity => $resource, $params ),
         '==',
         $success,
         $description,
