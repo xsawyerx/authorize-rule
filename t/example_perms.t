@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 24;
+use Test::More tests => 30;
 use Authorize::Rule;
 use Data::Dumper;
 
@@ -24,42 +24,70 @@ $Data::Dumper::Indent = 0;
 # * sysadmins:
 #   - can access Graphs
 
+#ENTITY => [
+#    RESOURCE => [
+#        [ ACTION, RULE, RULE ],
+#    ]
+#]
+
 my $rules = {
-    dev => [
-        deny  => ['Payroll'],
-        allow => '*',
-    ],
+    dev => {
+        Payroll => [ [0] ], # always deny
+        ''      => [ [1] ], # default allow
+    },
 
-    admin => [ allow => '*' ],
+    tester => {
+        '' => [
+            'check tester' => [ 1, { is_test => 1 }, 'test_name', 'test_id' ],
+            'default' => [0],
+        ]
+    },
 
-    biz_rel => [
-        deny  => ['Graphs'],
-        allow => {
-            Databases => { table => ['Reservations'] }
-        },
-        deny => { Invoices => { user => '*' } },
-        allow => [ 'Invoices', 'Revenue', 'Payroll' ],
-        deny => '*',
-    ],
+    admin => { '' => [ [1] ] },
 
-    support => [
-        allow => {
-            Databases => { table => ['Complaints'] },
-            Invoices    => '*',
-        },
-        deny  => '*',
-    ],
+    biz_rel => {
+        Graphs    => [ [0] ],
+        Databases => [
+            [ 1, { table => 'Reservations' } ],
+        ],
 
-    sysadmins => [
-        allow => ['Graphs'],
-        deny  => '*',
-    ],
+        Invoices => [
+            [ 0, 'user' ],
+            [ 1         ],
+        ],
+
+        Payroll => [ [1] ],
+        Revenue => [ [1] ],
+        ''      => [ [0] ],
+    },
+
+#    support => [
+#        allow => {
+#            Databases => { table => ['Complaints'] },
+#            Invoices    => '*',
+#        },
+#        deny  => '*',
+#    ],
+    support => {
+        Databases => [
+            [ 1, { table => 'Complaints' } ],
+        ],
+
+        Invoices => [ [1] ],
+        ''       => [ [0] ],
+    },
+
+    sysadmins => {
+        Graphs => [ [1] ],
+        ''     => [ [0] ],
+    },
 };
+
 
 my $auth = Authorize::Rule->new( default => -1, rules => $rules );
 
 isa_ok( $auth, 'Authorize::Rule' );
-can_ok( $auth, 'check'           );
+can_ok( $auth, 'is_allowed'      );
 
 my @groups  = keys %{$rules};
 my @sources = qw<Databases Graphs Invoices Revenue Payroll>;
@@ -78,7 +106,15 @@ my @tests = (
     [ qw<0 support   Databases>, { table => 'Reservations' } ],
     [ qw<0 support   Databases> ],
     [ qw<1 sysadmins Graphs>    ],
-    [ qw<0 sysadmins Databases> ],
+    [ qw<0 tester    Databases> ],
+    [ qw<0 tester    Invoices>, { is_test => 1 } ],
+    [ qw<0 tester    Invoices>, { is_test => 1, test_name => 'hi' } ],
+    [ qw<1 tester    Invoices>,
+        { is_test => 1, test_name => 'hi', test_id => 30 } ],
+    [ qw<1 tester    Invoices>,
+        { is_test => 1, test_name => 'hi', test_id => 0 } ],
+    [ qw<0 tester    Invoices>,
+        { is_test => 1, test_name => undef, test_id => 30 } ],
 );
 
 # admin accesses everything
@@ -96,10 +132,25 @@ foreach my $test (@tests) {
                       ( $params ? ', params: ' . Dumper($params) : '' );
 
     cmp_ok(
-        $auth->check( $entity, $resource, $params ),
+        $auth->is_allowed( $entity, $resource, $params ),
         '==',
         $success,
         $description,
     );
 }
 
+is_deeply(
+    $auth->allowed(
+        'tester', 'Payroll',
+        { test_id => 13, test_name => 'it', is_test => 1 }
+    ),
+    {
+        entity      => 'tester',
+        resource    => 'Payroll',
+        params      => { test_id => 13, test_name => 'it', is_test => 1 },
+        action      => 1,
+        label       => 'check tester',
+        ruleset_idx => 1,
+    },
+    'Ruleset labeling works',
+);

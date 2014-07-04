@@ -9,33 +9,31 @@ use Authorize::Rule;
 my $auth = Authorize::Rule->new(
     rules => {
         # Marge can do everything
-        Marge => [ allow => '*' ],
+        Marge => { '' => [ [1] ] },
 
         # Homer can do everything except go to the kitchen
-        Homer => [
-            deny  => ['oven'],
-            allow => '*',
-        ],
+        Homer => {
+            oven => [ [0] ],
+            ''   => [ [1] ],
+        },
 
         # kids can clean and eat at the kitchen
         # but nothing else
         # and they can do whatever they want in their bedroom
-        kids => [
-            allow => {
-                kitchen => {
-                    action => ['eat', 'clean'],
-                },
+        kids => {
+            kitchen => [
+                [ 1, { action => 'eat'   } ],
+                [ 1, { action => 'clean' } ],
+                [0],
+            ],
 
-                bedroom => '*',
-            },
-
-            deny => ['kitchen'],
-        ],
+            bedroom => [ [1] ],
+        },
     },
 );
 
 isa_ok( $auth, 'Authorize::Rule' );
-can_ok( $auth, 'check'           );
+can_ok( $auth, 'is_allowed'      );
 
 my @tests = (
     [ qw<1 Marge kitchen>               ],
@@ -67,7 +65,7 @@ foreach my $test (@tests) {
     $action and ($action) = split /\s/, $action;
 
     cmp_ok(
-        $auth->check( $entity, $resource, { action => $action } ),
+        $auth->is_allowed( $entity, $resource, { action => $action } ),
         '==',
         $success,
         $description

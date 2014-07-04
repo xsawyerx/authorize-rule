@@ -9,20 +9,21 @@ use Authorize::Rule;
 my $auth = Authorize::Rule->new(
     default => -1,
     rules   => {
-        CEO => [
-            deny  => ['Payroll'],
-            allow => '*',
-        ],
+        CEO => {
+            Payroll => [ [0] ],
+            ''      => [ [1] ],
+        },
 
-        support => [
-            allow => [ 'UserPreferences', 'UserComplaintHistory' ],
-            deny  => '*',
-        ],
+        support => {
+            UserPreferences      => [ [1] ],
+            UserComplaintHistory => [ [1] ],
+            ''                   => [ [0] ],
+        },
     }
 );
 
 isa_ok( $auth, 'Authorize::Rule' );
-can_ok( $auth, 'check'           );
+can_ok( $auth, 'is_allowed'      );
 
 my @tests = (
     [ qw<0 CEO     Payroll> ],
@@ -41,7 +42,7 @@ foreach my $test (@tests) {
                       " access $resource";
 
     cmp_ok(
-        $auth->check( $entity => $resource ),
+        $auth->is_allowed( $entity => $resource ),
         '==',
         $success,
         $description,

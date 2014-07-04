@@ -3,132 +3,119 @@ package Authorize::Rule;
 
 use strict;
 use warnings;
+use Carp       'croak';
 use List::Util 'first';
 
 sub new {
     my $class = shift;
+    my %opts  = @_;
+
+    defined $opts{'rules'}
+        or croak 'You must provide rules';
+
     return bless {
-        rules   => [], # empty rules
-        default => 0,  # deny by default
-        @_
+        default => 0, # deny by default
+        %opts,
     }, $class;
 }
 
 sub default {
     my $self = shift;
+    @_ and croak 'default() is a ro attribute';
     return $self->{'default'};
 }
 
 sub rules {
     my $self = shift;
+    @_ and croak 'rules() is a ro attribute';
     return $self->{'rules'};
 }
 
-sub check {
+sub is_allowed {
+    my $self = shift;
+    return $self->allowed(@_)->{'action'};
+}
+
+sub allowed {
     my $self         = shift;
     my $entity       = shift;
     my $req_resource = shift;
-    my $req_params   = shift;
+    my $req_params   = shift || {};
+    my $default      = $self->default;
     my $rules        = $self->rules;
+    my %result       = (
+        entity   => $entity,
+        resource => ($req_resource || ''),
+        params   => $req_params,
+    );
 
     # deny entities that aren't in the rules
-    my $perms = $rules->{$entity} or return $self->default;
+    my $perms = $rules->{$entity}
+        or return { %result, action => $default };
 
-    foreach ( my $i = 0; $i < $#{$perms}; $i += 2 ) {
-        my $type     = $perms->[$i];
-        my $resource = $perms->[ $i + 1 ];
+    # the requested and default
+    my $main_ruleset = $perms->{$req_resource} || [];
+    my $def_ruleset  = $perms->{''}            || [];
 
-        $type eq 'allow' || $type eq 'deny'
-            or die "Type must be allow/deny (not '$type')";
+    # if neither, return default action
+    @{ $main_ruleset } || @{ $def_ruleset }
+        or return { %result, action => $default };
 
-        my $allowed = $type eq 'allow';
+    foreach my $rulesets ( $main_ruleset, $def_ruleset ) {
+        my $ruleset_idx;
+        my $label;
 
-        # check full access to a resource
-        # allow => '*'
-        if ( !ref($resource) && $resource eq '*' ) {
-            return $allowed ? 1 : 0;
-        }
-
-        # we don't allow anything other than * or refs
-        my $res_ref = ref $resource
-            or die 'Resource must be string (*) or HASH/ARRAY ref';
-
-        if ( $res_ref eq 'ARRAY' ) {
-            # check full access to multiple (R)esources
-
-            # allow => [ 'R1', 'R2' ]
-            # (same as: allow => { R1 => '*', R2 => '*' })
-            first { $req_resource eq $_ } @{$resource}
-                and return $allowed ? 1 : 0;
-
-            # tried, move to next rule
-            next;
-        } elsif ( $res_ref eq 'HASH' ) {
-            # check for access to a (R)esource's parameters (K)eys and (V)alues
-
-            # find the parameters for that resource
-            # if we don't have any, this is the wrong resource, try again
-            my $resource_params = $resource->{$req_resource}
-                or next;
-
-            # allow => { R1 => '*' }
-            if ( !ref($resource_params) && $resource_params eq '*' ) {
-                return $allowed ? 1 : 0;
+        foreach my $ruleset ( @{$rulesets} ) {
+            if ( ! ref $ruleset ) {
+                $label = $ruleset;
+                next;
             }
 
-            # we don't allow anything other than * or refs
-            my $res_prm_ref = ref $resource_params
-                or die 'Resource must be string(*) or HASH/ARRAY ref';
+            $ruleset_idx++;
 
-            # here we've been asked to have fine grain control over the
-            # possible parameter keys and their values, but the user
-            # might not have provided that information in the request
-            # so we can't match this rule, we just skip
-            $req_params or next;
+            my $action = $self->match_ruleset( $ruleset, $req_params );
+            defined $action
+                and return {
+                    %result,
+                    action      => $action,
+                    ruleset_idx => $ruleset_idx,
+                  ( label       => $label        )x!! defined $label,
+                };
 
-            # we currently only allow the user to provide params in hash form
-            ref $req_params and ref($req_params) eq 'HASH'
-                or die 'Request params must be HASH ref';
-
-            # allow => { R1 => [ 'K1', 'K2' ] }
-            # (same as: allow => { R1 => { K1 => '*', K2 => '*' } })
-            if ( $res_prm_ref eq 'ARRAY' ) {
-                foreach my $res_prm ( @{$resource_params} ) {
-                    first { $res_prm eq $_ } keys %{$req_params}
-                        and return $allowed ? 1 : 0;
-                }
-            } elsif ( $res_prm_ref eq 'HASH' ) {
-                foreach my $res_param ( keys %{$resource_params} ) {
-                    my $res_param_val = $resource_params->{$res_param};
-
-                    # allow => { R1 => { K1 => '*' } }
-                    if ( !ref($res_param_val) && $res_param_val eq '*' ) {
-                        return $allowed ? 1 : 0;
-                    }
-
-                    # allow => { R1 => { K1 => ['V1'] } }
-                    # allow => { R2 => { K2 => ['V2', 'V3'] } }
-                    ref $res_param_val eq 'ARRAY'
-                        or die 'Resource param must be string(*) or ARRAY ref';
-
-                    # try and find our param in the request
-                    my $req_param_val = $req_params->{$res_param}
-                        or next;
-
-                    first { $req_param_val eq $_ } @{$res_param_val}
-                        and return $allowed ? 1 : 0;
-                }
-            } else {
-                die "resource parameter of type $res_prm_ref not allowed";
-            }
-        } else {
-            die "resource of reference type $res_ref not allowed";
+            undef $label;
         }
-
-        next; # to ignore next block
     }
 
-    return $self->default;
+    return { %result, action => $default };
+}
+
+sub match_ruleset {
+    my $self       = shift;
+    my $ruleset    = shift;
+    my $req_params = shift;
+
+    my ( $action, @rules ) = @{$ruleset}
+        or return;
+
+    foreach my $rule (@rules) {
+        if ( ref $rule eq 'HASH' ) {
+            # check defined params by rule against requested params
+            foreach my $key ( keys %{$rule} ) {
+                defined $req_params->{$key}
+                    or return; # no match
+
+                $req_params->{$key} eq $rule->{$key}
+                    or return; # no match
+            }
+        } elsif ( ! ref $rule ) {
+            defined $req_params->{$rule}
+                or return; # no match
+        } else {
+            croak 'Unknown rule type';
+        }
+    }
+
+    return $action;
 }
 
 1;
@@ -150,7 +137,7 @@ A simple example:
             # Marge can do everything
             Marge => [ allow => '*' ],
 
-            # Homer can do everything except go to the kitchen
+            # Homer can do everything except use the oven
             Homer => [
                 deny  => ['oven'],
                 allow => '*',

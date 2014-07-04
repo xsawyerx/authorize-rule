@@ -1,5 +1,9 @@
 Revision history for Perl extension Authorize::Rule.
 
-0.001   xx.xx.xx
+0.002   09.09.13
+        * Small POD correction.
+          (thanks, Mr. Spaz)
+
+0.001   08.09.13
         * It works. Yay!
 

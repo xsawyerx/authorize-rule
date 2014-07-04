@@ -9,20 +9,22 @@ use Authorize::Rule;
 my $auth = Authorize::Rule->new(
     default => -1,
     rules   => {
-        Bender => [
-            deny  => [ 'fly ship', 'command team' ],
-            allow => '*',
-        ],
+        Bender => {
+            'fly ship'     => [ [0] ],
+            'command team' => [ [0] ],
+            ''             => [ [1] ],
+        },
 
-        Leila => [
-            deny  => ['goof off'],
-            allow => [ 'fly ship', 'command team' ],
-        ]
+        Leila => {
+            'goof off'     => [ [0] ],
+            'fly ship'     => [ [1] ],
+            'command team' => [ [1] ],
+        },
     },
 );
 
 isa_ok( $auth, 'Authorize::Rule' );
-can_ok( $auth, 'check'           );
+can_ok( $auth, 'is_allowed'      );
 
 my @tests = (
     [ qw< 0 Bender>, 'fly ship'     ],
@@ -41,7 +43,7 @@ foreach my $test (@tests) {
                       " $resource";
 
     cmp_ok(
-        $auth->check( $entity => $resource ),
+        $auth->is_allowed( $entity => $resource ),
         '==',
         $success,
         $description,
