@@ -1,5 +1,10 @@
 Revision history for Perl extension Authorize::Rule.
 
+0.003   06.07.14
+        *** A major rewrite ***
+        This new version addresses everything I felt was problematic
+        with the new version. Consider it a complete rewrite.
+
 0.002   09.09.13
         * Small POD correction.
           (thanks, Mr. Spaz)
