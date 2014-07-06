@@ -61,13 +61,6 @@ my $rules = {
         ''      => [ [0] ],
     },
 
-#    support => [
-#        allow => {
-#            Databases => { table => ['Complaints'] },
-#            Invoices    => '*',
-#        },
-#        deny  => '*',
-#    ],
     support => {
         Databases => [
             [ 1, { table => 'Complaints' } ],

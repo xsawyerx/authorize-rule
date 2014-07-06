@@ -130,141 +130,188 @@ Stay tuned.
 
 =head1 SYNOPSIS
 
-A simple example:
+This is an extensive example, showing various options:
 
     my $auth = Authorize::Rule->new(
         rules => {
-            # Marge can do everything
-            Marge => [ allow => '*' ],
+            dev => {
+                Payroll => [ [0] ], # always deny
+                ''      => [ [1] ], # default allow for unknown resources
+            },
 
-            # Homer can do everything except use the oven
-            Homer => [
-                deny  => ['oven'],
-                allow => '*',
-            ],
+            tester => {
+                '' => [
+                    # labeled rulesets
+                    'check tester' => [
+                        # all rules must apply
+                        # key 'is_test' with value 1
+                        # and keys test_name/test_id must exist
+                        1, { is_test => 1 }, 'test_name', 'test_id'
+                    ],
+                    'default' => [0],
+                ]
+            },
 
-            # kids can clean and eat at the kitchen
-            # but nothing else
-            # and they can do whatever they want in their bedroom
-            kids => [
-                allow => {
-                    kitchen => {
-                        action => ['eat', 'clean'],
-                    },
+            admin => { '' => [ [1] ] },
 
-                    bedroom => '*',
-                },
+            biz_rel => {
+                Graphs    => [ [0] ],
+                Databases => [
+                    # access to reservations table
+                    [ 1, { table => 'Reservations' } ],
+                ],
 
-                deny => ['kitchen'],
-            ],
+                Invoices => [
+                    [ 0, 'user' ],
+                    [ 1         ],
+                ],
+
+                Payroll => [ [1] ],
+                Revenue => [ [1] ],
+                ''      => [ [0] ],
+            },
+
+            support => {
+                Databases => [
+                    [ 1, { table => 'Complaints' } ],
+                ],
+
+                Invoices => [ [1] ],
+                ''       => [ [0] ],
+            },
+
+            sysadmins => {
+                Graphs => [ [1] ],
+                ''     => [ [0] ],
+            },
         },
     );
 
-    $auth->check( Marge => 'kitchen' ); # 1
-    $auth->check( Marge => 'garage'  ); # 1
-    $auth->check( Marge => 'bedroom' ); # 1
-    $auth->check( Homer => 'oven'    ); # 0
-    $auth->check( Homer => 'kitchen' ); # 1
-
-    $auth->check( kids => 'kitchen', { action => 'eat'     } ); # 1
-    $auth->check( kids => 'kitchen', { action => 'destroy' } ); # 0
+I<(this example is not taken from any actual code)>
 
 =head1 DESCRIPTION
 
-L<Authorize::Rule> allows you to provide a set of rules for authorizing access
-of entities to resources.  This does not cover authentication.
+L<Authorize::Rule> allows you to provide a set of rulesets, each containing
+rules, for authorizing access of entities to resources. This does not cover
+authentication, or fine-grained parameter checking.
+
 While authentication asks "who are you?", authorization asks "what are you
 allowed to do?"
 
-The system is based on decisions per resources and their parameters.
+The system is based on decisions per entities, resources, and any optional
+parameters.
 
-The following two authorization decisions are available:
+=head1 SPECIFICATION
+
+The specification covers several elements:
 
 =over 4
 
-=item * allow
+=item * Entity
 
-Allow an action.  If something is allowed, B<1> (indicating I<true>) is
-returned.
+=item * Resource
 
-=item * deny
+=item * Action
 
-Deny an action.  If something is denied, B<0> (indicating I<false>) is returned.
+=item * Optional parameters
+
+=item * Optional label
 
 =back
 
-The following levels of authorization are available:
+The general structure is:
 
-=over 4
+    {
+        ENTITY => {
+            RESOURCE => [
+                OPTIONAL_LABEL => [ ACTION, RULE1, RULE2, ...RULE10 ],
+            ]
+        }
 
-=item * For all resources
+    }
 
-Cats think they can do everything.
+Allowed rules are:
+
+    # parameters must have this key with this value
+    [ $action, { key => 'value' } ]
+    [ $action, { name => 'Marge' } ]
+    [ $action, { names => [ qw<Marge Homer Lisa Bart Maggie> ] } ]
+    [ $action, { families => { Simpsons => [...] } } ]
+
+    # parameters must have these keys, values aren't checked
+    [ $action, 'key1', 'key2', ... ]
+
+    # they can be seamlessly mixed
+    [ $action, { Company => 'Samsung' }, { Product => 'Phone' }, 'model_id' ]
+
+    # and yes, this is the equivalent of:
+    [ $action, { Company => 'Samsung', Product => 'Phone' }, 'model_id' ]
+
+    # labels can be applied to rulesets:
+    'verifying test account' => [ $action, { username => 'tester' } ]
+
+An action is either true or false, but can be provided any defined value.
+Traditionally these will be C<1> or C<0>:
+
+    [ 1, RULES... ]
+    [ 0, RULES... ]
+    [ 'FAILURE', RULES... ]
+
+    my $result = $auth->is_allowed( $entity, $resource );
+    if ( $result eq 'FAILURE' ) {
+        ...
+    }
+
+Rules are read consecutively and as soon as a rule matches the matching stops.
+
+=head1 EXAMPLES
+
+=head2 All resources
+
+Cats think they can do everything, and they can:
 
     my $rules = {
-        cats => [ allow => '*' ]
-    };
+        Cat => {
+            # default rule for any unmatched resource
+            '' => [
+                # only 1 ruleset with no actual rules, just an action
+                [1]
+            ],
+        }
+    }
 
     my $auth = Authorize::Rule->new( rules => $rules );
     $auth->check( cats => 'kitchen' ); # 1, success
     $auth->check( cats => 'bedroom' ); # 1, success
 
-The star (B<*>) character means 'allow/deny all resources to this entity'. By
-setting the C<cats> entity to C<allow>, we basically allow cats on all
-resources. The resources can be anything such as couch, counter, tables, etc.
-
 If you don't like the example of cats (what's wrong with you?), try to think
 of a department (or person) given all access to all resources in your company:
 
     $rules = {
-        syadmins => [ allow => '*' ],
-        CEO      => [ allow => '*' ],
+        Sysadmins => {
+            '' => [ [1] ],
+        },
+
+        CEO => {
+            '' => [ [1] ],
+        },
     }
 
-=item * Per resource
+=head2 Per resource
 
 Dogs, however, provide less of a problem. Mostly if you tell them they aren't
-allowed somewhere, they will comply. Dogs can't get on the table. Except the
-table, we do want them to have access everywhere.
+allowed somewhere, they will comply. Dogs can't get on the table. Other than
+the table, we do want them to have access everywhere.
 
     $rules = {
-        cats => [ allow => '*' ],
-        dogs => [
-            deny  => ['table'], # they can't go on the table
-            allow => '*',       # otherwise, allow everything
-        ],
-    }
+        Cat => {
+            '' => [ [1] ],
+        },
 
-To provide access (allow/deny) to resources, you have specify them as an array.
-This helps differ between the star character for 'all'.
-
-Rules are read consecutively and as soon as a rule matches the matching stops.
-
-You can provide multiple resources in a single rule. That way we can ask dogs
-to also keep away from the laundry room:
-
-    $rules = {
-        cats => [ allow => '*' ],
-        dogs => [
-            deny  => [ 'table', 'laundry room' ], # they can't go on the table
-            allow => '*',                         # otherwise, allow everything
-        ],
-    }
-
-Suppose we adopted kitties and we want to keep them safe until they grow older,
-we keep them in our room and keep others out:
-
-    $rules = {
-        cats => [ deny => ['bedroom'], allow => '*' ],
-        dogs => [
-            deny  => [ 'table', 'laundry room', 'bedroom' ],
-            allow => '*',
-        ],
-
-        kitties => [
-            allow => ['bedroom'],
-            deny  => '*',
-        ],
+        Dog => {
+            Table => [ [0] ], # can't go on the table
+            ''    => [ [1] ], # otherwise, allow everything
+        },
     }
 
 A corporate example might refer to some departments (or persons) having access
@@ -272,75 +319,151 @@ to some resources while denied everything else, or a certain resource not
 available to some while all others are.
 
     $rules = {
-        CEO => [
-            deny  => ['Payroll'],
-            allow => '*',
-        ],
+        CEO => {
+            Payrolls => [ [0] ], # no access to Payrolls
+            ''       => [ [1] ], # access to everything else
+        },
 
-        support => [
-            allow => [ 'UserPreferences', 'UserComplaintHistory' ],
-            deny  => '*',
-        ],
+        Support => {
+            UserPreferences      => [ [1] ], # has access to this
+            UserComplaintHistory => [ [1] ], # and this
+            ''                   => [ [0] ], # but that's it
+        },
     }
 
-You might ask 'what if there is no last catch-all rule at the end?' - the
-answer is that the C<default> clause will be used. You can find an explanation
-of it under I<ATTRIBUTES>.
-
-=item * Per resource and per conditions
+=head2 Per resource and per conditions
 
 This is the most extensive control you can have. This allows you to set
 permissions based on conditions, such as specific parameters per resource.
-
-The conditions are sent to the C<check> method as additional parameters
-and checked against it.
 
 Suppose we have no problem for the dogs to walk on that one table we don't
 like?
 
     my $rules => {
-        dogs => [
-            allow => {
-                table => { owner => ['someone-else'] }
-            },
+        Dog => {
+            Table => [
+                # if the table is owned by someone else, it's okay
+                [ 1, { owner => 'someone-else' } ],
 
-            deny  => ['table'],
-            allow => '*',
-        ]
+                # otherwise, no
+                [0],
+            ],
+
+            '' => [ [1] ], # but generally dogs can go everywhere
+        }
     };
 
     my $auth = Authorize::Rule->new( rules => $rules );
-    $auth->check( dogs => 'table', { owner => 'me' } ); # 0, fails
+    $auth->is_allowed( Dog => 'Table', { owner => 'me' } ); # 0, fails
 
-Of course you can use a star (C<*>) as the value which means 'all'.
+You can also specify just the existence (and C<define>ss) of keys:
 
-Since you specify values as an array, you can specify multiple values. They
-will each be checked against the value of each hash key. We assume the hash
-value for each key is a single string.
-
-Here we specify a list of people whose things we don't mind the dog ruining:
-
-    my $rules => {
-        dogs => [
-            allow => {
-                table => { owner => ['jim', 'john'] }
-            },
-
-            deny  => ['table'],
-            allow => '*',
-        ]
+    my $rules = {
+        Support => {
+            ClientTable => [
+                [ 1, 'user_id' ], # must have a user id to access the table
+                [0],              # otherwise, access denied
+            ]
+        }
     };
 
-    my $auth = Authorize::Rule->new( rules => $rules );
-    $auth->check( dogs => 'table', { owner => 'me'   } ); # 0, fails
-    $auth->check( dogs => 'table', { owner => 'jim'  } ); # 1, succeeds
-    $auth->check( dogs => 'table', { owner => 'john' } ); # 1, succeeds
+=head2 OR conditions
 
-=back
+If you want to create an B<OR> condition, all you need is to provide another
+ruleset:
 
-More complicated structures (other than hashref of keys to string values)
-are currently not supported, though there are plans to add callbacks in
-order to allow the user to specify their own checks of conditions.
+    my $rules = {
+        Dog => {
+            Table => [
+                [ 1, { carer => 'Jim'  } ], # if Jim takes care of the dog
+                [ 1, { carer => 'John' } ], # or if John does
+                [0],                        # otherwise, no
+            ]
+        }
+    };
+
+    $auth->is_allowed( Dog => 'Table', { owner => 'me'   } ); # 0, fails
+    $auth->is_allowed( Dog => 'Table', { owner => 'Jim'  } ); # 1, succeeds
+    $auth->is_allowed( Dog => 'Table', { owner => 'John' } ); # 1, succeeds
+
+=head2 AND conditions
+
+If you want to create an B<AND> condition, just add more rules to the
+ruleset:
+
+    my $rules = {
+        Dog => {
+            Table => [
+                [
+                    1,                     # allow if...
+                    { carer => 'John'   }, # john is the carer
+                    { day   => 'Sunday' }, # it's Sunday
+                    { clean => 1        }, # you're clean
+                    'tag_id',              # and you have a tag id
+                # otherwise, no
+                [0],
+            ]
+        }
+    };
+
+As shown in other examples above, any hash rules can be put in the same
+hash, so this is equivalent:
+
+
+    my $rules = {
+        Dog => {
+            Table => [
+                [
+                    1,                     # allow if...
+                    {
+                        carer => 'John',   # john is the carer
+                        day   => 'Sunday', # it's Sunday
+                        clean => 1,        # you're clean
+                    },
+                    'tag_id',              # and you have a tag id
+                # otherwise, no
+                [0],
+            ]
+        }
+    };
+
+The order of rules does not change anything, except how quickly it might
+mismatch. If you have insane amounts of rules and conditions, it could make
+a difference, but unlikely.
+
+=head2 labeling
+
+Optional labels can be applied in order to help structure rulesets and
+understand which ruleset matched.
+
+    my $rules = {
+        Tester => {
+            # Tester's rulesets for any resource
+            '' => [
+                # regular ruleset
+                [ 1, 'test_mode' ], # if we're in test_mode
+
+                # labeled ruleset
+                'has test ID' => [ 1, 'test_id' ], # has a test ID
+            ],
+        },
+    };
+
+Labeled and unlabeled rulesets can be interchanged freely.
+
+=head2 Catch all
+
+You might ask I<what if there is no last rule at the end for any other
+resource?>
+
+The answer is simple: the C<default> clause will be used. You can find an
+explanation of it under I<ATTRIBUTES>.
+
+=head2 Callbacks
+
+Currently callbacks are not supported, but there are plans for a later
+version. The issue with callbacks is that you will not be able to serialize
+the rules.
 
 =head1 ATTRIBUTES
 
@@ -355,123 +478,47 @@ to allow by default if there is no match.
         rules   => {...},
     );
 
+    Authorize::Rule->new(
+        default => -1, # to make sure it's the catch-all
+        rules   => {...},
+    );
+
 =head2 rules
 
-A hash reference of your permissions.
-
-Top level keys are the entities. This can be groups, users, whichever way you
-choose to view it.
-
-    {
-        ENTITY => RULES,
-    }
-
-For each entity you provide an arrayref of the rules. The will be read and
-matched in sequential order. It's good practice to have an explicit last one
-as the catch-all for that entity. However, take into account that there is
-also the C<default>. By default it will deny unless you change the default
-to allow.
-
-    {
-        ENTITY => [
-            RULE1,
-            RULE2,
-        ],
-    }
-
-Each rule contains a key of the action, either to C<allow> or C<deny>,
-followed by a resource definition.
-
-    {
-        ENTITY => [
-            ACTION => RESOURCE
-        ]
-    }
-
-You can provide a value of star (C<*>) to say 'this entity can do everything'
-or 'this entity cannot do anyting'. You can provide an arrayref of the
-resources you want to allow/deny.
-
-    {
-        Bender => [
-            deny  => [ 'fly ship', 'command team' ],
-            allow => '*', # allow everything else
-        ],
-
-        Leila => [
-            deny  => ['goof off'],
-            allow => [ 'fly ship', 'command team' ],
-            # if none are matched, it will take the default
-        ]
-    }
-
-You can also provide conditions as a hashref for each resource. The value
-should be either a star (C<*>) to match key existence, or an arrayref to
-try and match the value.
-
-    {
-        Bender => [
-            allow => {
-                # must have booze to function
-                functioning => { booze => '*' }
-            },
-
-            # allow friendship to these people
-            allow => {
-                friendship => { person => [ 'Leila', 'Fry', 'Amy' ]
-            },
-
-            # deny friendship to everyone else
-            deny => ['friendship'],
-        ]
-    }
+A hash reference of your permissions, defined by the specification explained
+above.
 
 =head1 METHODS
 
-=head2 check
+=head2 is_allowed
 
-    $auth->check( ENTITY, RESOURCE );
-    $auth->check( ENTITY, RESOURCE, { CONDITIONS } );
+Returns the action for the entity and resource.
 
-You decide what entities and resources you have according to how you define
-the rules.
+Effectively, this is the C<action> key in the result coming from the
+C<allowed> method described below.
 
-You can think of resources as possible actions on an interface:
+=head2 allowed
 
-    my $auth = Authorize::Rule->new(
-        rules => {
-            Sawyer => [ allow => [ 'view', 'edit' ] ]
-        }
-    );
+    my $result = $auth->allowed( $entity, $resource, $params );
 
-    $auth->check( Sawyer => 'edit' )
-        or die 'Sawyer is not allowed to edit';
+Returns an entire hash containing every piece of information that might be
+helpful:
 
-However, if you have multiple interfaces (which you usually do in more
-complicated environments), your resources are those interfaces:
+=over 4
 
-    my $auth = Authorize::Rule->new(
-        rules => {
-            Sawyer => [ allow => [ 'Dashboard', 'Forum' ] ],
-        }
-    );
+=item * entity
 
-    # can I access the dashboard?
-    $auth->check( Sawyer => 'Dashboard' );
+=item * resource
 
-That's better. However, it doesn't describe what Sawyer can do in each
-resource. This is why you have conditions.
+=item * params
 
-    my $auth = Authorize::Rule->new(
-        rules => {
-            Sawyer => [
-                allow => {
-                    Dashboard => { action => ['edit', 'view'] }
-                }
-            ]
-        }
-    );
+=item * action
 
-    $auth->check( Sawyer => 'Dashboard', { action => 'delete' } )
-        or die 'Stop trying to delete the Dashboard, Sawyer!';
+=item * label
+
+=item * ruleset_idx
+
+The index of the ruleset, starting from 1.
+
+=back
 
