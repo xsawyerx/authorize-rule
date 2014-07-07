@@ -108,11 +108,19 @@ sub match_ruleset {
         if ( ref $rule eq 'HASH' ) {
             # check defined params by rule against requested params
             foreach my $key ( keys %{$rule} ) {
+                # check the key exists and value is defined
                 defined $req_params->{$key}
                     or return; # no match
 
-                $req_params->{$key} eq $rule->{$key}
-                    or return; # no match
+                # check matching against a code reference
+                if ( ref $rule->{$key} eq 'CODE' ) {
+                    $req_params->{$key} eq $rule->{$key}->($req_params)
+                        or return;
+                } else {
+                    # check matching against a simple string
+                    $req_params->{$key} eq $rule->{$key}
+                        or return; # no match
+                }
             }
         } elsif ( ref $rule eq 'CODE' ) {
             $rule->($req_params)
