@@ -116,6 +116,9 @@ sub match_ruleset {
                 if ( ref $rule->{$key} eq 'CODE' ) {
                     $req_params->{$key} eq $rule->{$key}->($req_params)
                         or return;
+                } elsif ( ref $rule->{$key} eq 'Regexp' ) {
+                    $req_params->{$key} =~ $rule->{$key}
+                        or return;
                 } else {
                     # check matching against a simple string
                     $req_params->{$key} eq $rule->{$key}

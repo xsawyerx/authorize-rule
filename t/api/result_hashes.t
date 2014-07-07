@@ -21,7 +21,7 @@ my $auth = Authorize::Rule->new(
     },
 );
 
-isa_ok( $auth, 'Authorize::Rule' );
+isa_ok( $auth, 'Authorize::Rule'      );
 can_ok( $auth, qw<allowed is_allowed> );
 
 {

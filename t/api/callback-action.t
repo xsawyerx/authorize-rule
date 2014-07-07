@@ -33,7 +33,7 @@ my $auth = Authorize::Rule->new(
 );
 
 isa_ok( $auth, 'Authorize::Rule' );
-can_ok( $auth, qw<allowed is_allowed> );
+can_ok( $auth, qw<is_allowed>    );
 
 is(
     $auth->is_allowed( 'Marge', 'Anywhere', { time => 'now' } ),
