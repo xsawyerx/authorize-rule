@@ -114,6 +114,9 @@ sub match_ruleset {
                 $req_params->{$key} eq $rule->{$key}
                     or return; # no match
             }
+        } elsif ( ref $rule eq 'CODE' ) {
+            $rule->($req_params)
+                or return;
         } elsif ( ! ref $rule ) {
             defined $req_params->{$rule}
                 or return; # no match
