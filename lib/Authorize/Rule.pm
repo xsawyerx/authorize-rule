@@ -74,13 +74,20 @@ sub allowed {
             $ruleset_idx++;
 
             my $action = $self->match_ruleset( $ruleset, $req_params );
-            defined $action
-                and return {
+
+            if ( defined $action ) {
+                my %full_result = (
                     %result,
-                    action      => $action,
                     ruleset_idx => $ruleset_idx,
                   ( label       => $label        )x!! defined $label,
-                };
+                );
+
+                $full_result{'action'} = ref $action eq 'CODE'      ?
+                                         $action->( \%full_result ) :
+                                         $action;
+
+                return \%full_result;
+            }
 
             undef $label;
         }
