@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 3;
+use Test::More tests => 4;
 use Test::Fatal;
 use Authorize::Rule;
 
@@ -14,9 +14,20 @@ like(
 );
 
 my $auth = Authorize::Rule->new(
-    rules => {},
+    rules => {
+        Person => {
+            Place => [
+                [ 1, { name => ['error'] } ]
+            ]
+        }
+    },
 );
 
 isa_ok( $auth, 'Authorize::Rule' );
 can_ok( $auth, qw<allowed is_allowed> );
 
+like(
+    exception { $auth->allowed( 'Person', 'Place', { name => 'blah' } ) },
+    qr/^Rule keys can only be strings, regexps, or code/,
+    'We fail on unknown reference in key value in params',
+);
