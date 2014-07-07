@@ -224,7 +224,7 @@ The general structure is:
     {
         ENTITY => {
             RESOURCE => [
-                OPTIONAL_LABEL => [ ACTION, RULE1, RULE2, ...RULE10 ],
+                OPTIONAL_LABEL => [ ACTION, RULE_1, RULE_2, ...RULE_N ],
             ]
         }
 
@@ -262,7 +262,8 @@ Traditionally these will be C<1> or C<0>:
         ...
     }
 
-Rules are read consecutively and as soon as a rule matches the matching stops.
+Rules are read consecutively and as soon as a rule matches the matching stops
+and the action value is returned.
 
 =head1 EXAMPLES
 
@@ -485,8 +486,11 @@ to allow by default if there is no match.
 
 =head2 rules
 
-A hash reference of your permissions, defined by the specification explained
+Rules can be either:
+- A hash reference of your permissions, defined by the specification explained
 above.
+- A key name (string) indicating this key must exist with no restriction to
+the value other than it must be defined.
 
 =head1 METHODS
 
