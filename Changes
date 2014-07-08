@@ -1,5 +1,16 @@
 Revision history for Perl extension Authorize::Rule.
 
+0.004   2014-07-08
+        (Moving to a new date format, don't be alarmed)
+        * [FEATURE] Callback as an action.
+        * [FEATURE] Callback as a rule.
+        * [FEATURE] Callback as a key value.
+        * [FEATURE] Regex as a key value, for regexp matching of value.
+        * [FEATURE] Allow checking for keys *not* existing as well.
+        * Decidingly supporting only flat parameters for now.
+        * Adhering to that decision better.
+        * Some docs improvement.
+
 0.003   06.07.14
         *** A major rewrite ***
         This new version addresses everything I felt was problematic
