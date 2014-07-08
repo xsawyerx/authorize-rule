@@ -104,13 +104,25 @@ sub match_ruleset {
     my ( $action, @rules ) = @{$ruleset}
         or return;
 
+    # an empty return() is a failure to match
+    # if matching of a rule succeeds, we just move to the next rule
     foreach my $rule (@rules) {
         if ( ref $rule eq 'HASH' ) {
             # check defined params by rule against requested params
             foreach my $key ( keys %{$rule} ) {
-                # check the key exists and value is defined
-                defined $req_params->{$key}
-                    or return; # no match
+                if ( defined $rule->{$key} ) {
+                    # check if key is missing
+                    defined $req_params->{$key}
+                        or return;
+                } else {
+                    # check the key exists and value is defined
+                    exists $req_params->{$key}
+                        and return;
+
+                    # don't continue checking the value in this case
+                    # because it's undefined
+                    next;
+                }
 
                 # check matching against a code reference
                 if ( ref $rule->{$key} eq 'CODE' ) {
