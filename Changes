@@ -1,5 +1,8 @@
 Revision history for Perl extension Authorize::Rule.
 
+0.005   2014-07-09
+        * Documentation updates and corrections.
+
 0.004   2014-07-08
         (Moving to a new date format, don't be alarmed)
         * [FEATURE] Callback as an action.

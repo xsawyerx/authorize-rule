@@ -187,7 +187,32 @@ This is an extensive example, showing various options:
                 ]
             },
 
-            admin => { '' => [ [1] ] },
+            admin => {
+                '' => [
+                    # the admin does *not* have a passwordless ssh key
+                    [ 1, { passwordless_ssh_key => undef } ] },
+                ],
+            }
+
+            ceo => {
+                '' => [
+                    [
+                        # decide on the value of the return ourselves
+                        # based on the resource
+                        sub {
+                            my $res = shift;
+                            return 'Access Granted for ' . $res->{'resource'};
+                        },
+
+                        # a rule that is itself a subroutine
+                        # with access to the parameters
+                        sub { has_permission( $_[0]->{'resource'} ) },
+
+                        # a rule with a key that matches the result of a sub
+                        { now => sub { correct_relative_time() } },
+                    ],
+                ],
+            },
 
             biz_rel => {
                 Graphs    => [ [0] ],
@@ -268,10 +293,11 @@ The general structure is:
 Allowed rules are:
 
     # parameters must have this key with this value
-    [ $action, { key => 'value' } ]
+    [ $action, { key  => 'value' } ]
     [ $action, { name => 'Marge' } ]
-    [ $action, { names => [ qw<Marge Homer Lisa Bart Maggie> ] } ]
-    [ $action, { families => { Simpsons => [...] } } ]
+
+    # parameters must not have this key
+    [ $action, { key => undef } ]
 
     # parameters must have these keys, values aren't checked
     [ $action, 'key1', 'key2', ... ]
@@ -282,10 +308,23 @@ Allowed rules are:
     # and yes, this is the equivalent of:
     [ $action, { Company => 'Samsung', Product => 'Phone' }, 'model_id' ]
 
+    # a mix of keys with expected values and keys expected not to exist
+    [ $action, { name => 'Marge', holding_knife => undef } ]
+
     # labels can be applied to rulesets:
     'verifying test account' => [ $action, { username => 'tester' } ]
 
-An action is either true or false, but can be provided any defined value.
+    # rules can be a subroutine
+    [ $action, sub { my $params = shift; ... } ]
+
+    # keys can match to a subroutine result
+    [ $action, { Company => sub { get_company( $_[0]->{'company'} ) } } ]
+
+    # and lastly, actions can be subroutines
+    [ sub { my $result_hash = shift; return 'OK' if ... }, { %params } ]
+
+An action is either true, false, or a code reference which returns one.
+The recommended values for true or false are C<1> or C<0>.
 Traditionally these will be C<1> or C<0>:
 
     [ 1, RULES... ]
@@ -297,8 +336,26 @@ Traditionally these will be C<1> or C<0>:
         ...
     }
 
-Rules are read consecutively and as soon as a rule matches the matching stops
-and the action value is returned.
+Or as a code reference:
+
+    [ sub {...}, RULES... ]
+
+The code reference receives the entire result hash as a parameter:
+
+    [ sub {
+        my $result = shift;
+
+        # $result = {
+        #     ruleset_idx => 1,
+        #     params      => $PARAMS,
+        #     entity      => $ENTITY,
+        #     resource    => $RESOURCE,
+        # }
+    }, RULES... ]
+
+Rules and rulesets are read consecutively, so you might want to position
+your rules in order to exit early. When a ruleset is matches, the execution
+or rulesets stops and the action is returned.
 
 =head1 EXAMPLES
 
@@ -317,8 +374,8 @@ Cats think they can do everything, and they can:
     }
 
     my $auth = Authorize::Rule->new( rules => $rules );
-    $auth->check( cats => 'kitchen' ); # 1, success
-    $auth->check( cats => 'bedroom' ); # 1, success
+    $auth->is_allowed( cats => 'kitchen' ); # 1, success
+    $auth->is_allowed( cats => 'bedroom' ); # 1, success
 
 If you don't like the example of cats (what's wrong with you?), try to think
 of a department (or person) given all access to all resources in your company:
@@ -497,9 +554,76 @@ explanation of it under I<ATTRIBUTES>.
 
 =head2 Callbacks
 
-Currently callbacks are not supported, but there are plans for a later
-version. The issue with callbacks is that you will not be able to serialize
-the rules.
+=head3 As rule
+
+A rule can be a callback:
+
+    my $rules = {
+        Marge => {
+            '' => [
+                [ 1, sub {
+                    my $params = shift;
+
+                    time - $params->{'now'} < 10
+                        and return 1;
+
+                    return 0;
+                } ]
+            ],
+        }
+    };
+
+    $auth->is_allowed( 'Marge', 'Anywhere', { now => time } );
+
+=head3 As parameter
+
+You can compare a parameter value to the result of a callback:
+
+    my $rules = {
+        Marge => {
+            '' => [
+                [ 1, { name => sub { get_name( $_[0]->{'entity'} ) } } ]
+            ]
+        }
+    };
+
+This will compare the C<name> value in the parameters to whatever will be
+returned by C<get_name>, which gets as a first argument the C<entity> that
+is used - in this case, I<Marge>.
+
+=head3 As action
+
+You can also set the action to be a callback, which allows to do two
+interesting things:
+
+=over 4
+
+=item * Change the action
+
+=item * Investigate the result hash
+
+=back
+
+    my $rules = {
+        Marge => {
+            '' => [
+                [
+                    sub {
+                        my $result = shift;
+                        return 'SucceededAt' . $result->{'resource'};
+                    },
+                    { time => 'now' }, # rule
+                ],
+            ]
+        }
+    };
+
+    my $auth   = Authorize::Rule->new( rules => $rules );
+    my $action = $auth->is_allowed( 'Marge', 'Somewhere', %params );
+    # $action = 'SucceededAtSomewhere'
+
+The result hash will contain information on the request and the matching,
+such as the ruleset which was matched.
 
 =head1 ATTRIBUTES
 
@@ -522,10 +646,24 @@ to allow by default if there is no match.
 =head2 rules
 
 Rules can be either:
-- A hash reference of your permissions, defined by the specification explained
+
+=over 4
+
+=item *
+
+ A hash reference of your permissions, defined by the specification explained
 above.
-- A key name (string) indicating this key must exist with no restriction to
+
+=item *
+
+A key name (string) indicating this key must exist with no restriction to
 the value other than it must be defined.
+
+=item *
+
+A callback with a result that provides the success or fail in boolean context.
+
+=back
 
 =head1 METHODS
 
