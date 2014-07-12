@@ -62,13 +62,13 @@ sub allowed {
         or return { %result, action => $default };
 
     foreach my $rulesets ( $main_ruleset, $def_ruleset ) {
-        my $ruleset_idx;
+        my $ruleset_idx = 0;
         my $label;
 
-        foreach my $ruleset ( @{$rulesets} ) {
+      R_SET: foreach my $ruleset ( @{$rulesets} ) {
             if ( ! ref $ruleset ) {
                 $label = $ruleset;
-                next;
+                next R_SET;
             }
 
             $ruleset_idx++;
@@ -79,7 +79,7 @@ sub allowed {
                 my %full_result = (
                     %result,
                     ruleset_idx => $ruleset_idx,
-                  ( label       => $label        )x!! defined $label,
+                  ( label       => $label        )x!! $label,
                 );
 
                 $full_result{'action'} = ref $action eq 'CODE'      ?
@@ -109,7 +109,7 @@ sub match_ruleset {
     foreach my $rule (@rules) {
         if ( ref $rule eq 'HASH' ) {
             # check defined params by rule against requested params
-            foreach my $key ( keys %{$rule} ) {
+          KEY: foreach my $key ( keys %{$rule} ) {
                 if ( defined $rule->{$key} ) {
                     # check if key is missing
                     defined $req_params->{$key}
@@ -121,7 +121,7 @@ sub match_ruleset {
 
                     # don't continue checking the value in this case
                     # because it's undefined
-                    next;
+                    next KEY;
                 }
 
                 # check matching against a code reference
