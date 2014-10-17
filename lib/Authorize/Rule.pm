@@ -12,8 +12,30 @@ sub new {
     defined $opts{'rules'}
         or croak 'You must provide rules';
 
-    ref $opts{'rules'} eq 'HASH'
+    my $rules = $opts{'rules'};
+    ref($rules) eq 'HASH'
         or croak 'attribute rules must be a hashref';
+
+    # $opts{'entity_groups'}   ||= {};
+    # $opts{'resource_groups'} ||= {};
+
+    if ( $opts{'entity_groups'} ) {
+        ref( $opts{'entity_groups'} ) eq 'HASH'
+            or croak 'attribute entity_groups must be a hashref';
+
+        # expand entity groups to their entities
+        foreach my $group ( keys %{ $opts{'entity_groups'} } ) {
+            my @entities = @{ $opts{'entity_groups'}{$group} };
+
+            # is group there?
+            my $group_rules = delete $rules->{$group}
+                or next;
+
+            foreach my $entity (@entities) {
+                $rules->{$entity} = $group_rules;
+            }
+        }
+    }
 
     return bless {
         default => 0, # deny by default
@@ -25,6 +47,12 @@ sub default {
     my $self = shift;
     @_ and croak 'default() is a ro attribute';
     return $self->{'default'};
+}
+
+sub entity_groups {
+    my $self = shift;
+    @_ and croak 'entity_groups() is a ro attribute';
+    return $self->{'entity_groups'};
 }
 
 sub rules {
@@ -192,9 +220,9 @@ This is an extensive example, showing various options:
             admin => {
                 '' => [
                     # the admin does *not* have a passwordless ssh key
-                    [ 1, { passwordless_ssh_key => undef } ] },
+                    [ 1, { passwordless_ssh_key => undef } ],
                 ],
-            }
+            },
 
             ceo => {
                 '' => [
@@ -246,6 +274,10 @@ This is an extensive example, showing various options:
                 Graphs => [ [1] ],
                 ''     => [ [0] ],
             },
+        },
+
+        entity_groups => {
+            sysadmins => [ qw<John Jim Goat> ],
         },
     );
 
@@ -644,6 +676,27 @@ to allow by default if there is no match.
         default => -1, # to make sure it's the catch-all
         rules   => {...},
     );
+
+=head2 entity_groups
+
+Entity groups allow you to group entities onto their own label. This means
+you can set up multiple entities at the same time, while still matching
+them by the entity name instead of group name.
+
+    my $auth = Authorize::Rule->new(
+        rules => {
+            'My Group' => {
+                Desk => [ [1] ],
+            },
+        },
+
+        entity_groups => {
+            'My Group' => [ qw<Sawyer Mickey> ],
+        },
+    );
+
+    # OK
+    $auth->is_allowed( 'Sawyer', 'Desk' );
 
 =head2 rules
 
