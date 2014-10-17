@@ -3,8 +3,7 @@ package Authorize::Rule;
 
 use strict;
 use warnings;
-use Carp       'croak';
-use List::Util 'first';
+use Carp 'croak';
 
 sub new {
     my $class = shift;

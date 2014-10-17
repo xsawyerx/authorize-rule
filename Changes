@@ -1,5 +1,8 @@
 Revision history for Perl extension Authorize::Rule.
 
+0.006   2014-07-xx
+        * Removed unnecessary List::Util dependency.
+
 0.005   2014-07-09
         * Documentation updates and corrections.
 
