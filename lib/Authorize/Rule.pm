@@ -12,6 +12,9 @@ sub new {
     defined $opts{'rules'}
         or croak 'You must provide rules';
 
+    ref $opts{'rules'} eq 'HASH'
+        or croak 'attribute rules must be a hashref';
+
     return bless {
         default => 0, # deny by default
         %opts,
