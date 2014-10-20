@@ -8,7 +8,7 @@ Authorize::Rule - Rule-based authorization mechanism
 
 =head1 VERSION
 
-version 0.005
+version 0.006
 
 =head1 SYNOPSIS
 
@@ -37,9 +37,9 @@ This is an extensive example, showing various options:
             admin => {
                 '' => [
                     # the admin does *not* have a passwordless ssh key
-                    [ 1, { passwordless_ssh_key => undef } ] },
+                    [ 1, { passwordless_ssh_key => undef } ],
                 ],
-            }
+            },
 
             ceo => {
                 '' => [
@@ -91,6 +91,14 @@ This is an extensive example, showing various options:
                 Graphs => [ [1] ],
                 ''     => [ [0] ],
             },
+        },
+
+        entity_groups => {
+            sysadmins => [ qw<John Jim Goat> ],
+        },
+
+        resource_groups => {
+            Graphs => [ 'ThisGraphs', 'ThoseGraphs' ],
         },
     );
 
@@ -495,6 +503,48 @@ to allow by default if there is no match.
         rules   => {...},
     );
 
+=head2 entity_groups
+
+Entity groups allow you to group entities onto their own label. This means
+you can set up multiple entities at the same time, while still matching
+them by the entity name instead of group name.
+
+    my $auth = Authorize::Rule->new(
+        rules => {
+            'My Group' => {
+                Desk => [ [1] ],
+            },
+        },
+
+        entity_groups => {
+            'My Group' => [ qw<Sawyer Mickey> ],
+        },
+    );
+
+    # OK
+    $auth->is_allowed( 'Sawyer', 'Desk' );
+
+=head2 resource_groups
+
+Resource groups allow you to group resources onto their own label, much
+like I<entity_groups>. You can set up multiple resources at the same time,
+while still matching them by the resource name instead of the group name.
+
+    my $auth = Authorize::Rule->new(
+        rules => {
+            Person => {
+                Home => [ [1] ],
+            },
+        },
+
+        resource_groups => {
+            Home => [ 'Bedroom', 'Living Room', ... ],
+        },
+    );
+
+    # OK
+    $auth->is_allowed( 'Person', 'Bedroom' );
+
 =head2 rules
 
 Rules can be either:
@@ -572,3 +622,4 @@ This software is copyright (c) 2014 by Sawyer X.
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
 
+=cut
