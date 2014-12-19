@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 4;
+use Test::More tests => 9;
 use Authorize::Rule;
 
 my $auth = Authorize::Rule->new(
@@ -13,12 +13,25 @@ my $auth = Authorize::Rule->new(
 
     rules => {
         Person => {
-            resource_groups => [
+            Group => [
                 [ 1, { name => 'me' } ]
-            ]
+            ],
+
+            NotGroup => [
+                [0],
+            ],
         },
     },
 );
+
+{
+    my $person_rules = $auth->{'rules'}{'Person'};
+    ok( exists $person_rules->{'Foo'}, 'Group expanded to Foo' );
+    ok( exists $person_rules->{'Bar'}, 'Group expanded to Bar' );
+    ok( exists $person_rules->{'Baz'}, 'Group expanded to Baz' );
+    ok( exists $person_rules->{'NotGroup'}, 'NotGroup resource kept' );
+    ok( ! exists $person_rules->{'Group'}, 'Group resource deleted' );
+}
 
 my $ruleset = [ 1, { name => 'me' } ];
 isa_ok( $auth, 'Authorize::Rule' );

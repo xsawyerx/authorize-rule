@@ -41,10 +41,13 @@ sub new {
 
         my %groups = %{ $opts{'resource_groups'} };
         foreach my $entity ( keys %{$rules} ) {
-            my $entity_perms = $rules->{$entity};
+            my $resources = $rules->{$entity};
 
-            foreach my $entity_group ( keys %{ $entity_perms } ) {
-                my $perms = delete $entity_perms->{$entity_group};
+            foreach my $entity_group ( keys %{ $resources } ) {
+                $opts{'resource_groups'}{$entity_group}
+                    or next;
+
+                my $perms = delete $resources->{$entity_group};
 
                 foreach my $src_group ( keys %groups ) {
                     my @actual_groups = @{ $groups{$src_group} };
