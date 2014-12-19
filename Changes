@@ -1,5 +1,8 @@
 Revision history for Perl extension Authorize::Rule.
 
+0.007   2014-12-xx
+        * Bugfix: resources were deleted even if not groups. (Andrei Vereha)
+
 0.006   2014-10-20
         * Adding entity groups.
         * Adding resource groups.
