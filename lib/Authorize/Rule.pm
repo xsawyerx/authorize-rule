@@ -22,15 +22,11 @@ sub new {
             or croak 'attribute entity_groups must be a hashref';
 
         foreach my $group ( keys %{ $opts{'entity_groups'} } ) {
-            my @entities = @{ $opts{'entity_groups'}{$group} };
-
-            # is $group there?
             my $group_rules = delete $rules->{$group}
                 or next;
 
-            foreach my $entity (@entities) {
-                $rules->{$entity} = $group_rules;
-            }
+            $rules->{$_} = $group_rules
+                for @{ $opts{'entity_groups'}{$group} };
         }
     }
 
@@ -39,21 +35,21 @@ sub new {
         ref( $opts{'resource_groups'} ) eq 'HASH'
             or croak 'attribute resource_groups must be a hashref';
 
-        my %groups = %{ $opts{'resource_groups'} };
+        # populate
         foreach my $entity ( keys %{$rules} ) {
-            my $resources = $rules->{$entity};
-
-            foreach my $entity_group ( keys %{ $resources } ) {
-                $opts{'resource_groups'}{$entity_group}
+            foreach my $resource ( keys %{ $rules->{$entity} } ) {
+                my $in_rsrc = $opts{'resource_groups'}{$resource}
                     or next;
 
-                my $perms = delete $resources->{$entity_group};
-
-                foreach my $src_group ( keys %groups ) {
-                    my @actual_groups = @{ $groups{$src_group} };
-                    $rules->{$entity}{$_} = $perms for @actual_groups;
-                }
+                $rules->{$entity}{$_} = $rules->{$entity}{$resource}
+                    for @{$in_rsrc};
             }
+        }
+
+        # delete
+        foreach my $entity ( keys %{$rules} ) {
+            delete $rules->{$entity}{$_}
+                for keys %{ $opts{'resource_groups'} };
         }
     }
 
