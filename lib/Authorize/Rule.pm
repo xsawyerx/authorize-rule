@@ -101,19 +101,27 @@ sub allowed {
         params   => $req_params,
     );
 
+    my $perms = $rules->{$entity} || {};
+    # perms for all the entities.
+    my $all_entities_perms = $rules->{''} || {};
+
     # deny entities that aren't in the rules
-    my $perms = $rules->{$entity}
+    $perms || $all_entities_perms
         or return { %result, action => $default };
 
     # the requested and default
     my $main_ruleset = $perms->{$req_resource} || [];
     my $def_ruleset  = $perms->{''}            || [];
 
+    # perm for all the entities. Lower priority than main&def ruleset
+    # we don't need to check $all_entities_perms->{''} because we have $default
+    my $all_entities_ruleset = $all_entities_perms->{$req_resource} || [];
+
     # if neither, return default action
-    @{ $main_ruleset } || @{ $def_ruleset }
+    @{ $main_ruleset } || @{ $def_ruleset } || @{ $all_entities_ruleset }
         or return { %result, action => $default };
 
-    foreach my $rulesets ( $main_ruleset, $def_ruleset ) {
+    foreach my $rulesets ( $main_ruleset, $def_ruleset, $all_entities_ruleset) {
         my $ruleset_idx = 0;
         my $label;
 

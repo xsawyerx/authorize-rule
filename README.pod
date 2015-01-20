@@ -251,6 +251,22 @@ of a department (or person) given all access to all resources in your company:
         },
     }
 
+=head2 All entities
+
+All entities can access the public resource:
+
+	my $auth = Authorize::Rule->new(
+            default => 0,
+            rules   => {
+                'Person' => {
+                    'place' => [ [ 1 ] ]
+                },
+                '' => {
+                    'public'     => [ [ 1 ] ],
+                    ''          => [ [ 1 ] ], # ignored, we have a $default for that
+                    }
+    });
+
 =head2 Per resource
 
 Dogs, however, provide less of a problem. Mostly if you tell them they aren't
