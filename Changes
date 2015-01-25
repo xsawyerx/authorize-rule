@@ -1,5 +1,8 @@
 Revision history for Perl extension Authorize::Rule.
 
+0.008   2015-01-25
+        * Feature: global per resource rules. (Andrei Vereha)
+
 0.007   2014-12-21
         * Bugfix: resources were deleted even if not groups. (Andrei Vereha)
         * Only cleanup after expanding all aliases.

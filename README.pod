@@ -8,7 +8,7 @@ Authorize::Rule - Rule-based authorization mechanism
 
 =head1 VERSION
 
-version 0.007
+version 0.008
 
 =head1 SYNOPSIS
 
@@ -250,6 +250,23 @@ of a department (or person) given all access to all resources in your company:
             '' => [ [1] ],
         },
     }
+
+=head2 All entities
+
+All entities can access the public resource:
+
+    my $auth = Authorize::Rule->new(
+        default => 0,
+        rules   => {
+            'Person' => {
+                'place' => [ [ 1 ] ]
+            },
+
+            '' => {
+                'public' => [ [ 1 ] ],
+                ''       => [ [ 1 ] ], # ignored, we have a default for that
+            },
+    });
 
 =head2 Per resource
 
@@ -617,7 +634,7 @@ Mickey Nasriachi <mickey@cpan.org>
 
 =head1 COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2014 by Sawyer X.
+This software is copyright (c) 2015 by Sawyer X.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.
