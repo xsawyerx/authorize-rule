@@ -101,9 +101,8 @@ sub allowed {
         params   => $req_params,
     );
 
-    my $perms = $rules->{$entity} || {};
-    # perms for all the entities.
-    my $all_entities_perms = $rules->{''} || {};
+    my $perms              = $rules->{$entity} || {};
+    my $all_entities_perms = $rules->{''}      || {};
 
     # deny entities that aren't in the rules
     $perms || $all_entities_perms
@@ -457,6 +456,23 @@ of a department (or person) given all access to all resources in your company:
             '' => [ [1] ],
         },
     }
+
+=head2 All entities
+
+All entities can access the public resource:
+
+    my $auth = Authorize::Rule->new(
+        default => 0,
+        rules   => {
+            'Person' => {
+                'place' => [ [ 1 ] ]
+            },
+
+            '' => {
+                'public' => [ [ 1 ] ],
+                ''       => [ [ 1 ] ], # ignored, we have a default for that
+            },
+    });
 
 =head2 Per resource
 
