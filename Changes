@@ -1,5 +1,8 @@
 Revision history for Perl extension Authorize::Rule.
 
+0.009   2016-10-14
+        * Provide a META.json file.
+
 0.008   2015-01-25
         * Feature: global per resource rules. (Andrei Vereha)
 
